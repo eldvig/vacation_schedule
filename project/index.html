@@ -1,0 +1,1579 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<title>График отпусков и дежурств 2026</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Segoe UI', Tahoma, sans-serif;
+    background: #f5f7fa;
+    padding: 20px;
+    color: #333;
+    overflow-x: hidden;
+  }
+  h1 {
+    text-align: center;
+    margin: 0 0 12px 0;
+    color: #2c3e50;
+    font-size: 1.2em;
+    font-weight: 600;
+  }
+  .container {
+    background: white;
+    border-radius: 10px;
+    padding: 20px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+  }
+  .controls {
+    margin-bottom: 15px;
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .controls button {
+    padding: 8px 16px;
+    background: #3498db;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 14px;
+  }
+  .controls button:hover { background: #2980b9; }
+  .controls .nav-button { background: #95a5a6; }
+  .controls .nav-button:hover { background: #7f8c8d; }
+  .controls .separator {
+    width: 2px;
+    height: 28px;
+    background: #d0d7de;
+    margin: 0 8px;
+    flex-shrink: 0;
+  }
+  
+  .controls button.active { 
+  background: #2980b9; 
+  box-shadow: inset 0 2px 4px rgba(0,0,0,0.15);
+}
+.controls .nav-button.active { 
+  background: #7f8c8d; 
+  box-shadow: inset 0 2px 4px rgba(0,0,0,0.15);
+}
+  
+  .file-input-wrapper {
+    position: relative;
+    overflow: hidden;
+    display: inline-block;
+  }
+  .file-input-wrapper input[type=file] {
+    position: absolute;
+    left: 0;
+    top: 0;
+    opacity: 0;
+    cursor: pointer;
+    width: 100%;
+    height: 100%;
+  }
+  .file-input-button {
+    background: #27ae60;
+    color: white;
+    padding: 8px 16px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 14px;
+    display: inline-block;
+  }
+  .file-input-button:hover { background: #229954; }
+  .chart-wrapper {
+    position: relative;
+    overflow-x: auto;
+    overflow-y: auto;
+    max-height: calc(100vh - 150px);
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    scrollbar-width: thin;
+    scrollbar-color: #d0d7de #f8f9fa;
+  }
+  .chart-wrapper::-webkit-scrollbar {
+    height: 10px;
+    width: 6px;
+  }
+  .chart-wrapper::-webkit-scrollbar-track {
+    background: #f8f9fa;
+    border-radius: 3px;
+  }
+  .chart-wrapper::-webkit-scrollbar-thumb {
+    background: #d0d7de;
+    border-radius: 3px;
+  }
+  .chart-wrapper::-webkit-scrollbar-thumb:hover {
+    background: #95a5a6;
+  }
+  .gantt-container {
+    display: grid;
+    min-width: fit-content;
+  }
+  .header-cell {
+    background: #ecf0f1;
+    padding: 8px 5px;
+    text-align: center;
+    font-size: 12px;
+    font-weight: bold;
+    border-bottom: 2px solid #bdc3c7;
+    border-right: 1px solid #ddd;
+  }
+  .header-cell.month {
+    background: #34495e;
+    color: white;
+    font-size: 13px;
+  }
+  .row-label {
+    background: #f8f9fa;
+    padding: 10px;
+    font-weight: 600;
+    border-bottom: 1px solid #eee;
+    border-right: 2px solid #bdc3c7;
+    display: flex;
+    align-items: center;
+    font-size: 14px;
+    cursor: grab;
+    user-select: none;
+    transition: background 0.2s;
+    position: sticky;
+    left: 0;
+    z-index: 5;
+    min-width: 180px;
+    box-shadow: 2px 0 5px rgba(0,0,0,0.05);
+  }
+  .row-label:hover { background: #e8f4f8; }
+  .row-label.dragging {
+    opacity: 0.5;
+    background: #d5e8f7;
+    cursor: grabbing;
+  }
+  .row-label.drag-over { border-top: 3px solid #3498db; }
+  .drag-handle {
+    margin-right: 10px;
+    color: #95a5a6;
+    font-size: 16px;
+    cursor: grab;
+  }
+  .row-label:hover .drag-handle { color: #3498db; }
+  .drag-indicator {
+    margin-left: auto;
+    color: #bdc3c7;
+    font-size: 12px;
+  }
+  .row-timeline {
+    position: relative;
+    height: 50px;
+    border-bottom: 1px solid #eee;
+    background-image: linear-gradient(to right, #f0f0f0 1px, transparent 1px);
+  }
+  .vacation-bar {
+    position: absolute;
+    top: 4px;
+    height: 42px;
+    border-radius: 5px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    color: white;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 0.15s, box-shadow 0.15s;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+    overflow: hidden;
+    white-space: nowrap;
+    z-index: 2;
+  }
+  .vacation-bar:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 10px rgba(0,0,0,0.25);
+    z-index: 10;
+  }
+  .duty-bar {
+    position: absolute;
+    top: 14px;
+    height: 22px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    color: white;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 0.15s, box-shadow 0.15s, background 0.15s;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+    overflow: hidden;
+    white-space: nowrap;
+    z-index: 3;
+    background: rgba(44, 62, 80, 0.55);
+    border: 2px solid rgba(255, 255, 255, 0.9);
+    text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+  }
+  .duty-bar:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+    z-index: 11;
+    background: rgba(44, 62, 80, 0.75);
+    border-color: rgba(255, 255, 255, 1);
+  }
+  .overlap-zone {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    background: rgba(231, 76, 60, 0.15);
+    border-left: 2px dashed #e74c3c;
+    border-right: 2px dashed #e74c3c;
+    pointer-events: none;
+    cursor: default;
+    z-index: 1;
+  }
+  .overlap-label {
+    position: absolute;
+    top: -22px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 16px;
+    color: #e74c3c;
+    font-weight: bold;
+    background: white;
+    padding: 1px 6px;
+    border-radius: 3px;
+    border: 1px solid #e74c3c;
+    white-space: nowrap;
+    z-index: 12;
+    pointer-events: auto;
+    cursor: help;
+    line-height: 1.2;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    transition: transform 0.15s, box-shadow 0.15s;
+  }
+  .overlap-label:hover {
+    transform: translateX(-50%) scale(1.15);
+    box-shadow: 0 2px 6px rgba(231, 76, 60, 0.4);
+    background: #fdf2f2;
+  }
+  .legend {
+    margin-top: 20px;
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+    justify-content: center;
+    font-size: 10px;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .legend-color {
+    width: 20px;
+    height: 14px;
+    border-radius: 3px;
+  }
+  
+  /* Стили для блока фильтрации по отделам */
+  .departments-filter {
+    margin-top: 15px;
+    padding: 12px 15px;
+    background: #f0f7ff;
+    border: 1px solid #c8dff5;
+    border-left: 4px solid #3498db;
+    border-radius: 5px;
+    font-size: 13px;
+  }
+  .departments-filter-title {
+    font-weight: 600;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .departments-filter-title span {
+    color: #2c3e50;
+  }
+  .dept-actions {
+    display: inline-flex;
+    gap: 8px;
+  }
+  .dept-actions button {
+    padding: 4px 10px;
+    background: #3498db;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+  }
+  .dept-actions button:hover { background: #2980b9; }
+  .dept-actions button.secondary {
+    background: #95a5a6;
+  }
+  .dept-actions button.secondary:hover { background: #7f8c8d; }
+  .departments-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 15px;
+  }
+  .dept-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 4px;
+    transition: background 0.15s;
+    user-select: none;
+  }
+  .dept-checkbox:hover { background: #e0edfa; }
+  .dept-checkbox input[type="checkbox"] {
+    cursor: pointer;
+    width: 16px;
+    height: 16px;
+  }
+  .dept-checkbox .dept-name {
+    font-size: 13px;
+    color: #2c3e50;
+  }
+  .dept-checkbox .dept-count {
+    font-size: 11px;
+    color: #7f8c8d;
+    margin-left: 2px;
+  }
+  
+  .tooltip {
+    position: fixed;
+    background: #2c3e50;
+    color: white;
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 13px;
+    pointer-events: none;
+    display: none;
+    z-index: 100;
+    max-width: 250px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  }
+  .tooltip strong { display: block; margin-bottom: 4px; }
+  #excelTooltip {
+    position: fixed;
+    background: #2c3e50;
+    color: white;
+    padding: 12px 16px;
+    border-radius: 6px;
+    font-size: 12px;
+    pointer-events: none;
+    display: none;
+    z-index: 200;
+    max-width: 450px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    line-height: 1.5;
+  }
+  #excelTooltip strong {
+    display: block;
+    margin-bottom: 6px;
+    font-size: 13px;
+    color: #3498db;
+  }
+  #excelTooltip ul {
+    margin: 4px 0;
+    padding-left: 18px;
+  }
+  #excelTooltip li {
+    margin: 2px 0;
+  }
+  .today-line {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: #e74c3c;
+    z-index: 6;
+  }
+  .today-line::before {
+    content: 'Сегодня';
+    position: absolute;
+    top: -18px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 10px;
+    color: #e74c3c;
+    font-weight: bold;
+    background: white;
+    padding: 1px 5px;
+  }
+  .stats {
+    margin-top: 15px;
+    padding: 12px;
+    background: #fff3cd;
+    border-left: 4px solid #f39c12;
+    border-radius: 5px;
+    font-size: 13px;
+  }
+  .features {
+    margin-top: 15px;
+    padding: 15px 20px;
+    background: #eaf4fb;
+    border: 1px solid #d1e8f7;
+    border-left: 4px solid #3498db;
+    border-radius: 5px;
+    font-size: 13px;
+    color: #2c3e50;
+  }
+  .features-title {
+    font-weight: 600;
+    margin-bottom: 8px;
+    display: block;
+    font-size: 14px;
+  }
+  .features-list {
+    margin: 0;
+    padding-left: 5px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 6px 15px;
+  }
+  .features-list li {
+    list-style: none;
+  }
+  .message {
+    margin-top: 10px;
+    padding: 10px;
+    border-radius: 5px;
+    font-size: 13px;
+    display: none;
+  }
+  .message.success {
+    background: #d4edda;
+    border-left: 4px solid #28a745;
+    color: #155724;
+    display: block;
+  }
+  .message.error {
+    background: #f8d7da;
+    border-left: 4px solid #dc3545;
+    color: #721c24;
+    display: block;
+  }
+  .message.info {
+    background: #d1ecf1;
+    border-left: 4px solid #17a2b8;
+    color: #0c5460;
+    display: block;
+  }
+</style>
+</head>
+<body>
+
+<h1>📅 График отпусков и дежурств сотрудников</h1>
+
+<div class="container">
+  <div class="controls">
+    <div class="file-input-wrapper" id="excelUploadWrapper">
+      <span class="file-input-button">📥 Загрузить Excel</span>
+      <input type="file" id="fileInput" accept=".xlsx,.xls" onchange="handleFileUpload(event)">
+    </div>
+    <button onclick="reshuffleColors()">🎲 Цвета</button>
+	<span class="separator"></span>
+<button onclick="toggleOverlap()" id="btnOverlap">👁️ Пересечения</button>
+<button onclick="toggleToday()" id="btnToday">👁️ Сегодня</button>
+<button onclick="toggleDuty()" id="btnDuty">👁️ Дежурства</button>
+<span class="separator"></span>
+<button onclick="changeView('day')" id="btnDay">Дни</button>
+<button onclick="changeView('week')" id="btnWeek">Недели</button>
+<button onclick="changeView('month')" id="btnMonth">Месяцы</button>
+<span class="separator"></span>
+<button class="nav-button" onclick="scrollChart('start')" title="В начало">◀◀</button>
+<button class="nav-button" onclick="scrollChart('left')" title="Назад">◀</button>
+<button class="nav-button" onclick="scrollChart('right')" title="Вперёд">▶</button>
+<button class="nav-button" onclick="scrollChart('end')" title="В конец">▶▶</button>
+  </div>
+  <div id="message" class="message"></div>
+  <div class="chart-wrapper" id="chart"></div>
+  <div class="legend" id="legend"></div>
+  <div class="departments-filter" id="departmentsFilter"></div>
+  <div class="stats" id="stats"></div>
+  
+  <div class="features">
+    <span class="features-title">🚀 Возможности и фичи:</span>
+    <ul class="features-list">
+      <li>✅ Диаграмма Ганта с отпусками и дежурствами сотрудников</li>
+      <li>✅ Дежурства отображаются полупрозрачным чёрным цветом с белой границей поверх отпусков</li>
+      <li>✅ Отображение отпуска больше по вертикали, чем дежурство (42px vs 22px)</li>
+      <li>✅ Кнопка скрытия/показа дежурств</li>
+      <li>✅ Sticky шапка — при вертикальной прокрутке заголовок с календарём остаётся на месте</li>
+      <li>✅ Sticky колонка "Сотрудник" — при горизонтальной прокрутке имена сотрудников видны слева</li>
+      <li>✅ Пересечения отпусков с правильной логикой разделения по составу сотрудников</li>
+      <li>✅ Drag-and-drop сотрудников (порядок сохраняется в localStorage при использовании данных из rawData; при загрузке из Excel сбрасывается)</li>
+      <li>✅ Случайные цвета при каждом запуске + кнопка 🎲 для перемешивания</li>
+      <li>✅ Переключение масштаба: Дни / Недели / Месяцы</li>
+      <li>✅ Кнопки навигации: Назад / Вперёд / В начало / В конец</li>
+      <li>✅ Линия "Сегодня" с возможностью скрытия</li>
+      <li>✅ Центрирование графика на сегодняшнем дне при нажатии "Сегодня", "Дни", "Недели", "Месяцы"</li>
+      <li>✅ Тултипы при наведении на отпуск или дежурство</li>
+      <li>✅ Статистика внизу страницы</li>
+      <li>✅ Загрузка данных из Excel файла (листы "отпуска" и "дежурства") с поддержкой столбца "Отдел"</li>
+      <li>✅ Фильтрация отображения по отделам с возможностью выбора нескольких отделов</li>
+      <li>✅ Подробная подсказка при наведении на кнопку загрузки Excel (не выходит за пределы экрана)</li>
+      <li>✅ Сообщения об успехе/ошибке загрузки (авто-скрытие через 5 сек)</li>
+    </ul>
+  </div>
+</div>
+
+<div class="tooltip" id="tooltip"></div>
+<div class="tooltip" id="excelTooltip"></div>
+
+<script>
+// ===== ДАННЫЕ =====
+// Формат: Имя \t Дата \t Дни \t Отдел
+let rawData = `Сотрудник_1	15.01.2026	10	Отдел А
+Сотрудник_1	01.03.2026	5	Отдел А
+Сотрудник_1	01.05.2026	10	Отдел А
+Сотрудник_2	01.01.2026	14	Отдел Б
+Сотрудник_2	01.03.2026	5	Отдел Б
+Сотрудник_2	01.05.2026	10	Отдел Б
+Сотрудник_2	01.07.2026	6	Отдел Б
+Сотрудник_2	01.08.2026	10	Отдел Б
+Сотрудник_3	01.01.2026	7	Отдел А
+Сотрудник_3	01.03.2026	10	Отдел А
+Сотрудник_3	01.05.2026	12	Отдел А`;
+
+let rawDuty = `Сотрудник_1	20.01.2026	3	Отдел А
+Сотрудник_2	10.02.2026	2	Отдел Б
+Сотрудник_2	15.05.2026	4	Отдел Б
+Сотрудник_3	05.03.2026	5	Отдел А
+Сотрудник_3	20.07.2026	3	Отдел А`;
+
+let showOverlap = true;
+let showTodayLine = true;
+let showDuty = true;
+let viewMode = 'week';
+let draggedEmployee = null;
+let dragSrcIndex = null;
+let colors = {};
+let selectedDepartments = new Set(); // Выбранные отделы для фильтрации
+
+// ===== ЗАГРУЗКА EXCEL =====
+function handleFileUpload(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  
+  try {
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      try {
+        const data = new Uint8Array(e.target.result);
+        const workbook = XLSX.read(data, { type: 'array' });
+        
+        let vacationsLoaded = false;
+        let dutiesLoaded = false;
+        let vacationCount = 0;
+        let dutyCount = 0;
+        
+        const vacationSheetName = workbook.SheetNames.find(name => 
+          name.toLowerCase().includes('отпуска') || name.toLowerCase() === 'vacations'
+        );
+        
+        if (vacationSheetName) {
+          const worksheet = workbook.Sheets[vacationSheetName];
+          const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+          const newData = [];
+          
+          for (let i = 1; i < jsonData.length; i++) {
+            const row = jsonData[i];
+            if (!row || row.length < 3) continue;
+            
+            const employee = String(row[0]).trim();
+            let dateValue = row[1];
+            const days = parseInt(row[2]);
+            const department = row.length >= 4 ? String(row[3] || '').trim() : '';
+            
+            if (!employee || !dateValue || isNaN(days)) continue;
+            
+            let dateStr;
+            if (dateValue instanceof Date) {
+              const d = String(dateValue.getDate()).padStart(2, '0');
+              const m = String(dateValue.getMonth() + 1).padStart(2, '0');
+              const y = dateValue.getFullYear();
+              dateStr = `${d}.${m}.${y}`;
+            } else if (typeof dateValue === 'number') {
+              const excelDate = new Date(Math.round((dateValue - 25569) * 86400 * 1000));
+              const d = String(excelDate.getDate()).padStart(2, '0');
+              const m = String(excelDate.getMonth() + 1).padStart(2, '0');
+              const y = excelDate.getFullYear();
+              dateStr = `${d}.${m}.${y}`;
+            } else {
+              dateStr = String(dateValue).trim();
+            }
+            
+            newData.push(`${employee}\t${dateStr}\t${days}\t${department}`);
+            vacationCount++;
+          }
+          
+          if (newData.length > 0) {
+            rawData = newData.join('\n');
+            vacationsLoaded = true;
+          }
+        }
+        
+        const dutySheetName = workbook.SheetNames.find(name => 
+          name.toLowerCase().includes('дежурства') || name.toLowerCase() === 'duties'
+        );
+        
+        if (dutySheetName) {
+          const worksheet = workbook.Sheets[dutySheetName];
+          const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+          const newData = [];
+          
+          for (let i = 1; i < jsonData.length; i++) {
+            const row = jsonData[i];
+            if (!row || row.length < 3) continue;
+            
+            const employee = String(row[0]).trim();
+            let dateValue = row[1];
+            const days = parseInt(row[2]);
+            const department = row.length >= 4 ? String(row[3] || '').trim() : '';
+            
+            if (!employee || !dateValue || isNaN(days)) continue;
+            
+            let dateStr;
+            if (dateValue instanceof Date) {
+              const d = String(dateValue.getDate()).padStart(2, '0');
+              const m = String(dateValue.getMonth() + 1).padStart(2, '0');
+              const y = dateValue.getFullYear();
+              dateStr = `${d}.${m}.${y}`;
+            } else if (typeof dateValue === 'number') {
+              const excelDate = new Date(Math.round((dateValue - 25569) * 86400 * 1000));
+              const d = String(excelDate.getDate()).padStart(2, '0');
+              const m = String(excelDate.getMonth() + 1).padStart(2, '0');
+              const y = excelDate.getFullYear();
+              dateStr = `${d}.${m}.${y}`;
+            } else {
+              dateStr = String(dateValue).trim();
+            }
+            
+            newData.push(`${employee}\t${dateStr}\t${days}\t${department}`);
+            dutyCount++;
+          }
+          
+          if (newData.length > 0) {
+            rawDuty = newData.join('\n');
+            dutiesLoaded = true;
+          }
+        }
+        
+        if (!vacationsLoaded && !dutiesLoaded) {
+          showMessage('❌ Листы "отпуска" и "дежурства" не найдены!', 'error');
+          return;
+        }
+        
+        localStorage.removeItem('employeeOrder');
+        
+        vacations.length = 0;
+        vacations.push(...parseData(rawData));
+        duties.length = 0;
+        duties.push(...parseData(rawDuty));
+        
+        employees = [...new Set([...vacations.map(v => v.name), ...duties.map(d => d.name)])];
+        
+                // Сбрасываем фильтр отделов и выбираем все
+        initDepartmentsFilter();
+        renderDepartmentsFilter(); // ← добавили перерисовку блока отделов
+        
+        const allDates = [...vacations.flatMap(v => [v.start, v.end]), ...duties.flatMap(d => [d.start, d.end])];
+        minDate = new Date(Math.min(...allDates));
+        maxDate = new Date(Math.max(...allDates));
+        minDate = new Date(minDate.getFullYear(), minDate.getMonth(), 1);
+        maxDate = new Date(maxDate.getFullYear(), maxDate.getMonth() + 1, 0);
+        
+        loadColors();
+        render();
+        
+        let msg = '✅ Загружено: ';
+        if (vacationsLoaded) msg += `отпуска (${vacationCount} записей)`;
+        if (vacationsLoaded && dutiesLoaded) msg += ', ';
+        if (dutiesLoaded) msg += `дежурства (${dutyCount} записей)`;
+        msg += ` из файла "${file.name}"`;
+        showMessage(msg, 'success');
+        
+      } catch (err) {
+        showMessage(`❌ Ошибка чтения файла: ${err.message}`, 'error');
+        console.error(err);
+      }
+    };
+    
+    reader.onerror = function() {
+      showMessage('❌ Ошибка чтения файла', 'error');
+    };
+    
+    reader.readAsArrayBuffer(file);
+    
+  } catch (err) {
+    showMessage(`❌ Ошибка: ${err.message}`, 'error');
+    console.error(err);
+  }
+  
+  event.target.value = '';
+}
+
+function showMessage(text, type) {
+  const messageDiv = document.getElementById('message');
+  messageDiv.textContent = text;
+  messageDiv.className = `message ${type}`;
+  
+  setTimeout(() => {
+    messageDiv.className = 'message';
+  }, 5000);
+}
+
+function parseData(text) {
+  const lines = text.trim().split('\n');
+  const result = [];
+  lines.forEach(line => {
+    const parts = line.split('\t');
+    if (parts.length >= 3) {
+      const [name, dateStr, days] = parts;
+      const department = parts.length >= 4 ? parts[3] : '';
+      const [d, m, y] = dateStr.split('.').map(Number);
+      const start = new Date(y, m - 1, d);
+      const end = new Date(y, m - 1, d + parseInt(days) - 1);
+      result.push({ 
+        name, 
+        start, 
+        end, 
+        days: parseInt(days),
+        department: department || ''
+      });
+    }
+  });
+  return result;
+}
+
+let vacations = parseData(rawData);
+let duties = parseData(rawDuty);
+let employees = [...new Set([...vacations.map(v => v.name), ...duties.map(d => d.name)])];
+
+let allDates = [...vacations.flatMap(v => [v.start, v.end]), ...duties.flatMap(d => [d.start, d.end])];
+let minDate = new Date(Math.min(...allDates));
+let maxDate = new Date(Math.max(...allDates));
+minDate = new Date(minDate.getFullYear(), minDate.getMonth(), 1);
+maxDate = new Date(maxDate.getFullYear(), maxDate.getMonth() + 1, 0);
+
+function daysBetween(d1, d2) {
+  const utc1 = Date.UTC(d1.getFullYear(), d1.getMonth(), d1.getDate());
+  const utc2 = Date.UTC(d2.getFullYear(), d2.getMonth(), d2.getDate());
+  return Math.round((utc2 - utc1) / (1000 * 60 * 60 * 24));
+}
+
+function formatDate(d) {
+  const dd = String(d.getDate()).padStart(2, '0');
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const yyyy = d.getFullYear();
+  return `${dd}.${mm}.${yyyy}`;
+}
+
+function generateRandomColor() {
+  const hue = Math.floor(Math.random() * 360);
+  const saturation = 55 + Math.floor(Math.random() * 20);
+  const lightness = 45 + Math.floor(Math.random() * 10);
+  return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
+}
+
+function assignRandomColors() {
+  const uniqueEmployees = [...new Set([...vacations.map(v => v.name), ...duties.map(d => d.name)])];
+  const assignedColors = {};
+  uniqueEmployees.forEach(emp => {
+    assignedColors[emp] = generateRandomColor();
+  });
+  return assignedColors;
+}
+
+function loadColors() {
+  colors = assignRandomColors();
+}
+
+function reshuffleColors() {
+  colors = assignRandomColors();
+  render();
+}
+
+// ===== ОТДЕЛЫ =====
+function getDepartments() {
+  const departments = new Set();
+  vacations.forEach(v => departments.add(v.department || ''));
+  duties.forEach(d => departments.add(d.department || ''));
+  return Array.from(departments).sort((a, b) => {
+    // Пустой отдел в конец
+    if (a === '' && b !== '') return 1;
+    if (a !== '' && b === '') return -1;
+    return a.localeCompare(b, 'ru');
+  });
+}
+
+function getDepartmentCounts() {
+  const deptEmployees = {};
+  
+  vacations.forEach(v => {
+    const dept = v.department || '';
+    if (!deptEmployees[dept]) deptEmployees[dept] = new Set();
+    deptEmployees[dept].add(v.name);
+  });
+  
+  duties.forEach(d => {
+    const dept = d.department || '';
+    if (!deptEmployees[dept]) deptEmployees[dept] = new Set();
+    deptEmployees[dept].add(d.name);
+  });
+  
+  // Преобразуем Set в число уникальных сотрудников
+  const result = {};
+  for (const dept in deptEmployees) {
+    result[dept] = deptEmployees[dept].size;
+  }
+  return result;
+}
+
+function initDepartmentsFilter() {
+  const departments = getDepartments();
+  selectedDepartments = new Set(departments);
+}
+
+function toggleDepartment(dept) {
+  if (selectedDepartments.has(dept)) {
+    selectedDepartments.delete(dept);
+  } else {
+    selectedDepartments.add(dept);
+  }
+  renderDepartmentsFilter();
+  render();
+}
+
+function selectAllDepartments() {
+  const departments = getDepartments();
+  selectedDepartments = new Set(departments);
+  renderDepartmentsFilter();
+  render();
+}
+
+function deselectAllDepartments() {
+  selectedDepartments = new Set();
+  renderDepartmentsFilter();
+  render();
+}
+
+function getFilteredVacations() {
+  return vacations.filter(v => selectedDepartments.has(v.department || ''));
+}
+
+function getFilteredDuties() {
+  return duties.filter(d => selectedDepartments.has(d.department || ''));
+}
+
+function getFilteredEmployees() {
+  const filteredSet = new Set([
+    ...getFilteredVacations().map(v => v.name),
+    ...getFilteredDuties().map(d => d.name)
+  ]);
+  
+  // Возвращаем сотрудников в порядке, сохранённом в employees
+  const result = [];
+  employees.forEach(emp => {
+    if (filteredSet.has(emp)) {
+      result.push(emp);
+    }
+  });
+  
+  // Добавляем новых сотрудников, которых нет в employees
+  filteredSet.forEach(emp => {
+    if (!employees.includes(emp)) {
+      result.push(emp);
+    }
+  });
+  
+  return result;
+}
+
+function renderDepartmentsFilter() {
+  const container = document.getElementById('departmentsFilter');
+  const departments = getDepartments();
+  const counts = getDepartmentCounts();
+  
+  if (departments.length === 0) {
+    container.innerHTML = '';
+    return;
+  }
+  
+  let html = `
+    <div class="departments-filter-title">
+      <span>🏢 Фильтр по отделам:</span>
+      <div class="dept-actions">
+        <button onclick="selectAllDepartments()">Выбрать все</button>
+        <button class="secondary" onclick="deselectAllDepartments()">Снять все</button>
+      </div>
+    </div>
+    <div class="departments-list">
+  `;
+  
+  departments.forEach(dept => {
+    const checked = selectedDepartments.has(dept) ? 'checked' : '';
+    const displayName = dept === '' ? '(без отдела)' : dept;
+    const employeesCount = counts[dept] || 0;
+    
+    html += `
+      <label class="dept-checkbox">
+        <input type="checkbox" ${checked} onchange="toggleDepartment('${dept.replace(/'/g, "\\'")}')">
+        <span class="dept-name">${displayName}</span>
+        <span class="dept-count">(${employeesCount} чел.)</span>
+      </label>
+    `;
+  });
+  
+  html += '</div>';
+  container.innerHTML = html;
+}
+
+function countOverlaps(vacs) {
+  const overlaps = [];
+  let currentDay = new Date(minDate);
+  let overlapStart = null;
+  let overlapEmployees = [];
+  
+  while (currentDay <= maxDate) {
+    const employeesOnVacation = new Set();
+    vacs.forEach(v => {
+      if (currentDay >= v.start && currentDay <= v.end) {
+        employeesOnVacation.add(v.name);
+      }
+    });
+    
+    const count = employeesOnVacation.size;
+    const currentEmployees = Array.from(employeesOnVacation).sort();
+    
+    if (count > 1) {
+      if (overlapStart === null) {
+        overlapStart = new Date(currentDay);
+        overlapEmployees = currentEmployees;
+      } else {
+        const isSameComposition = 
+          overlapEmployees.length === currentEmployees.length &&
+          overlapEmployees.every((emp, i) => emp === currentEmployees[i]);
+        
+        if (!isSameComposition) {
+          const overlapEnd = new Date(currentDay);
+          overlapEnd.setDate(overlapEnd.getDate() - 1);
+          overlaps.push({
+            start: overlapStart,
+            end: overlapEnd,
+            employees: [...overlapEmployees]
+          });
+          overlapStart = new Date(currentDay);
+          overlapEmployees = currentEmployees;
+        }
+      }
+    } else {
+      if (overlapStart !== null) {
+        const overlapEnd = new Date(currentDay);
+        overlapEnd.setDate(overlapEnd.getDate() - 1);
+        overlaps.push({
+          start: overlapStart,
+          end: overlapEnd,
+          employees: [...overlapEmployees]
+        });
+        overlapStart = null;
+        overlapEmployees = [];
+      }
+    }
+    
+    currentDay.setDate(currentDay.getDate() + 1);
+  }
+  
+  if (overlapStart !== null) {
+    overlaps.push({
+      start: overlapStart,
+      end: new Date(maxDate),
+      employees: [...overlapEmployees]
+    });
+  }
+  
+  return overlaps;
+}
+
+function getCellSize() {
+  return viewMode === 'day' ? 20 : viewMode === 'week' ? 40/7 : 120/30;
+}
+
+function updateButtonStates() {
+  // Toggle-кнопки: активны когда соответствующая переменная = true
+  const btnOverlap = document.getElementById('btnOverlap');
+  const btnToday = document.getElementById('btnToday');
+  const btnDuty = document.getElementById('btnDuty');
+  
+  if (btnOverlap) btnOverlap.classList.toggle('active', showOverlap);
+  if (btnToday) btnToday.classList.toggle('active', showTodayLine);
+  if (btnDuty) btnDuty.classList.toggle('active', showDuty);
+  
+  // Кнопки масштаба: активна та, что соответствует текущему viewMode
+  const btnDay = document.getElementById('btnDay');
+  const btnWeek = document.getElementById('btnWeek');
+  const btnMonth = document.getElementById('btnMonth');
+  
+  if (btnDay) btnDay.classList.toggle('active', viewMode === 'day');
+  if (btnWeek) btnWeek.classList.toggle('active', viewMode === 'week');
+  if (btnMonth) btnMonth.classList.toggle('active', viewMode === 'month');
+}
+
+function render() {
+  const chart = document.getElementById('chart');
+  const legend = document.getElementById('legend');
+  const stats = document.getElementById('stats');
+  chart.innerHTML = '';
+  legend.innerHTML = '';
+
+  // Используем отфильтрованные данные
+  const filteredVacations = getFilteredVacations();
+  const filteredDuties = getFilteredDuties();
+  const filteredEmployees = getFilteredEmployees();
+  
+  // Пересчитываем диапазон дат на основе отфильтрованных данных
+  let currentMinDate, currentMaxDate;
+  if (filteredVacations.length > 0 || filteredDuties.length > 0) {
+    const allDates = [...filteredVacations.flatMap(v => [v.start, v.end]), ...filteredDuties.flatMap(d => [d.start, d.end])];
+    currentMinDate = new Date(Math.min(...allDates));
+    currentMaxDate = new Date(Math.max(...allDates));
+    currentMinDate = new Date(currentMinDate.getFullYear(), currentMinDate.getMonth(), 1);
+    currentMaxDate = new Date(currentMaxDate.getFullYear(), currentMaxDate.getMonth() + 1, 0);
+  } else {
+    currentMinDate = minDate;
+    currentMaxDate = maxDate;
+  }
+
+  const totalDays = daysBetween(currentMinDate, currentMaxDate) + 1;
+  const cellSize = getCellSize();
+  const timelineWidth = totalDays * cellSize;
+
+  const ganttContainer = document.createElement('div');
+  ganttContainer.className = 'gantt-container';
+  ganttContainer.style.display = 'grid';
+  ganttContainer.style.gridTemplateColumns = `180px ${timelineWidth}px`;
+  ganttContainer.style.minWidth = `${180 + timelineWidth}px`;
+
+  const headerLabel = document.createElement('div');
+  headerLabel.className = 'header-cell';
+  headerLabel.textContent = 'Сотрудник';
+  headerLabel.style.position = 'sticky';
+  headerLabel.style.left = '0';
+  headerLabel.style.top = '0';
+  headerLabel.style.zIndex = '11';
+  headerLabel.style.background = '#ecf0f1';
+  headerLabel.style.borderRight = '2px solid #bdc3c7';
+  ganttContainer.appendChild(headerLabel);
+
+  const headerTimeline = document.createElement('div');
+  headerTimeline.style.display = 'flex';
+  headerTimeline.style.flexDirection = 'column';
+  headerTimeline.style.borderBottom = '2px solid #bdc3c7';
+  headerTimeline.style.position = 'sticky';
+  headerTimeline.style.top = '0';
+  headerTimeline.style.zIndex = '10';
+  headerTimeline.style.background = '#ffffff';
+  headerTimeline.style.boxShadow = '0 2px 5px rgba(0,0,0,0.1)';
+
+  const monthsRow = document.createElement('div');
+  monthsRow.style.display = 'flex';
+  monthsRow.style.borderBottom = '1px solid #ddd';
+  monthsRow.style.background = '#34495e';
+  let cursor = new Date(currentMinDate);
+  while (cursor <= currentMaxDate) {
+    const monthStart = new Date(cursor.getFullYear(), cursor.getMonth(), 1);
+    const monthEnd = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 0);
+    const startDay = daysBetween(currentMinDate, monthStart);
+    const endDay = daysBetween(currentMinDate, monthEnd);
+    const width = (endDay - startDay + 1) * cellSize;
+    const monthCell = document.createElement('div');
+    monthCell.className = 'header-cell month';
+    monthCell.style.minWidth = `${width}px`;
+    monthCell.style.maxWidth = `${width}px`;
+    monthCell.style.flexShrink = '0';
+    monthCell.textContent = cursor.toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' });
+    monthsRow.appendChild(monthCell);
+    cursor.setMonth(cursor.getMonth() + 1);
+  }
+  headerTimeline.appendChild(monthsRow);
+
+  const daysRow = document.createElement('div');
+  daysRow.style.display = 'flex';
+  daysRow.style.background = '#ecf0f1';
+  
+  if (viewMode === 'day') {
+    for (let i = 0; i < totalDays; i++) {
+      const d = new Date(currentMinDate);
+      d.setDate(d.getDate() + i);
+      const dayCell = document.createElement('div');
+      dayCell.className = 'header-cell';
+      dayCell.style.minWidth = `${cellSize}px`;
+      dayCell.style.maxWidth = `${cellSize}px`;
+      dayCell.style.flexShrink = '0';
+      dayCell.textContent = d.getDate();
+      daysRow.appendChild(dayCell);
+    }
+  } else if (viewMode === 'week') {
+    let dayIndex = 0;
+    while (dayIndex < totalDays) {
+      const d = new Date(currentMinDate);
+      d.setDate(d.getDate() + dayIndex);
+      const daysInThisCell = Math.min(7, totalDays - dayIndex);
+      const width = daysInThisCell * cellSize;
+      const weekCell = document.createElement('div');
+      weekCell.className = 'header-cell';
+      weekCell.style.minWidth = `${width}px`;
+      weekCell.style.maxWidth = `${width}px`;
+      weekCell.style.flexShrink = '0';
+      weekCell.textContent = `${d.getDate()}.${String(d.getMonth()+1).padStart(2,'0')}`;
+      daysRow.appendChild(weekCell);
+      dayIndex += daysInThisCell;
+    }
+  } else {
+    cursor = new Date(currentMinDate);
+    while (cursor <= currentMaxDate) {
+      const monthStart = new Date(cursor.getFullYear(), cursor.getMonth(), 1);
+      const monthEnd = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 0);
+      const startDay = daysBetween(currentMinDate, monthStart);
+      const endDay = daysBetween(currentMinDate, monthEnd);
+      const daysInMonth = endDay - startDay + 1;
+      const width = daysInMonth * cellSize;
+      const monthCell = document.createElement('div');
+      monthCell.className = 'header-cell';
+      monthCell.style.minWidth = `${width}px`;
+      monthCell.style.maxWidth = `${width}px`;
+      monthCell.style.flexShrink = '0';
+      monthCell.textContent = cursor.toLocaleDateString('ru-RU', { month: 'short' });
+      daysRow.appendChild(monthCell);
+      cursor.setMonth(cursor.getMonth() + 1);
+    }
+  }
+  headerTimeline.appendChild(daysRow);
+  ganttContainer.appendChild(headerTimeline);
+
+  // Подсчёт пересечений для отфильтрованных отпусков
+  let employeeOverlapsMap = {};
+  if (showOverlap) {
+    const allOverlaps = countOverlaps(filteredVacations);
+    allOverlaps.forEach(ov => {
+      ov.employees.forEach(empName => {
+        if (!employeeOverlapsMap[empName]) employeeOverlapsMap[empName] = [];
+        employeeOverlapsMap[empName].push(ov);
+      });
+    });
+  }
+
+  filteredEmployees.forEach((emp, idx) => {
+    const rowLabel = document.createElement('div');
+    rowLabel.className = 'row-label';
+    rowLabel.draggable = true;
+    rowLabel.dataset.employee = emp;
+    rowLabel.dataset.index = idx;
+    rowLabel.innerHTML = `
+      <span class="drag-handle">⋮</span>
+      <span style="display:inline-block;width:12px;height:12px;background:${colors[emp] || '#95a5a6'};border-radius:3px;margin-right:8px;"></span>
+      ${emp}
+      <span class="drag-indicator">↕</span>`;
+    
+    rowLabel.addEventListener('dragstart', handleDragStart);
+    rowLabel.addEventListener('dragend', handleDragEnd);
+    rowLabel.addEventListener('dragover', handleDragOver);
+    rowLabel.addEventListener('dragenter', handleDragEnter);
+    rowLabel.addEventListener('dragleave', handleDragLeave);
+    rowLabel.addEventListener('drop', handleDrop);
+    
+    ganttContainer.appendChild(rowLabel);
+
+    const timeline = document.createElement('div');
+    timeline.className = 'row-timeline';
+    timeline.dataset.employee = emp;
+    timeline.style.width = `${timelineWidth}px`;
+    timeline.style.backgroundSize = `${cellSize}px 100%`;
+
+    const empVacations = filteredVacations.filter(v => v.name === emp);
+    empVacations.forEach(v => {
+      const startOffset = daysBetween(currentMinDate, v.start);
+      const barWidth = v.days * cellSize;
+      const bar = document.createElement('div');
+      bar.className = 'vacation-bar';
+      bar.style.left = `${startOffset * cellSize}px`;
+      bar.style.width = `${barWidth}px`;
+      bar.style.background = colors[emp] || '#95a5a6';
+      bar.textContent = `${v.days} дн.`;
+      bar.dataset.start = formatDate(v.start);
+      bar.dataset.end = formatDate(v.end);
+      bar.dataset.days = v.days;
+      bar.dataset.type = 'Отпуск';
+      bar.dataset.department = v.department || '';
+      bar.addEventListener('mouseenter', showTooltip);
+      bar.addEventListener('mouseleave', hideTooltip);
+      timeline.appendChild(bar);
+    });
+
+    if (showDuty) {
+      const empDuties = filteredDuties.filter(d => d.name === emp);
+      empDuties.forEach(d => {
+        const startOffset = daysBetween(currentMinDate, d.start);
+        const barWidth = d.days * cellSize;
+        const bar = document.createElement('div');
+        bar.className = 'duty-bar';
+        bar.style.left = `${startOffset * cellSize}px`;
+        bar.style.width = `${barWidth}px`;
+        bar.textContent = `${d.days} дн.`;
+        bar.dataset.start = formatDate(d.start);
+        bar.dataset.end = formatDate(d.end);
+        bar.dataset.days = d.days;
+        bar.dataset.type = 'Дежурство';
+        bar.dataset.department = d.department || '';
+        bar.addEventListener('mouseenter', showTooltip);
+        bar.addEventListener('mouseleave', hideTooltip);
+        timeline.appendChild(bar);
+      });
+    }
+
+    if (showOverlap && employeeOverlapsMap[emp]) {
+      const addedZones = new Set();
+      employeeOverlapsMap[emp].forEach(ov => {
+        const zoneKey = `${ov.start.getTime()}-${ov.end.getTime()}`;
+        if (!addedZones.has(zoneKey)) {
+          addedZones.add(zoneKey);
+          const startOffset = daysBetween(currentMinDate, ov.start);
+          const endOffset = daysBetween(currentMinDate, ov.end);
+          const width = (endOffset - startOffset + 1) * cellSize;
+          
+          const zone = document.createElement('div');
+          zone.className = 'overlap-zone';
+          zone.style.left = `${startOffset * cellSize}px`;
+          zone.style.width = `${width}px`;
+          timeline.appendChild(zone);
+          
+          const label = document.createElement('span');
+          label.className = 'overlap-label';
+          label.textContent = '⚠';
+          label.title = `Пересечение отпусков (${ov.employees.length} чел.):\n${ov.employees.join(', ')}`;
+          zone.appendChild(label);
+        }
+      });
+    }
+
+    if (showTodayLine) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      if (today >= currentMinDate && today <= currentMaxDate) {
+        const offset = daysBetween(currentMinDate, today);
+        const line = document.createElement('div');
+        line.className = 'today-line';
+        line.style.left = `${offset * cellSize}px`;
+        timeline.appendChild(line);
+      }
+    }
+
+    ganttContainer.appendChild(timeline);
+  });
+
+  chart.appendChild(ganttContainer);
+
+  // Легенда
+  filteredEmployees.forEach(emp => {
+    legend.innerHTML += `<div class="legend-item"><div class="legend-color" style="background:${colors[emp] || '#95a5a6'}"></div><span>${emp}</span></div>`;
+  });
+  if (showOverlap) {
+    legend.innerHTML += `<div class="legend-item"><div class="legend-color" style="background:rgba(231,76,60,0.3);border:2px dashed #e74c3c"></div><span>Пересечение отпусков</span></div>`;
+  }
+  legend.innerHTML += `<div class="legend-item"><div class="legend-color" style="background:#2c3e50"></div><span>Дежурство</span></div>`;
+
+  // Статистика
+  const overlapsCount = showOverlap ? countOverlaps(filteredVacations).length : 0;
+  stats.innerHTML = `
+    <strong>📊 Статистика:</strong> Всего отпусков: <b>${filteredVacations.length}</b> | 
+    Дежурств: <b>${filteredDuties.length}</b> | 
+    Сотрудников: <b>${filteredEmployees.length}</b> | 
+    Период: <b>${formatDate(currentMinDate)} — ${formatDate(currentMaxDate)}</b> | 
+    Пересечений отпусков: <b>${overlapsCount}</b>
+    ${overlapsCount > 0 ? '<br>⚠️ Обнаружены пересечения отпусков!' : '<br>✅ Пересечений отпусков не обнаружено.'}
+  `;
+}
+
+function showTooltip(e) {
+  const tt = document.getElementById('tooltip');
+  const type = e.target.dataset.type || 'Отпуск';
+  const dept = e.target.dataset.department;
+  const deptLine = dept ? `<br>Отдел: ${dept}` : '';
+  tt.innerHTML = `<strong>${e.target.parentElement.dataset.employee} — ${type}</strong>
+    Начало: ${e.target.dataset.start}<br>
+    Конец: ${e.target.dataset.end}<br>
+    Дней: ${e.target.dataset.days}${deptLine}`;
+  tt.style.display = 'block';
+  tt.style.left = (e.clientX + 10) + 'px';
+  tt.style.top = (e.clientY + 10) + 'px';
+}
+
+function hideTooltip() {
+  document.getElementById('tooltip').style.display = 'none';
+}
+
+function toggleOverlap() {
+  showOverlap = !showOverlap;
+  render();
+  updateButtonStates(); // ← добавить
+}
+
+function toggleToday() {
+  showTodayLine = !showTodayLine;
+  render();
+  updateButtonStates(); // ← добавить
+  setTimeout(() => scrollToToday(), 50);
+}
+
+function toggleDuty() {
+  showDuty = !showDuty;
+  render();
+  updateButtonStates(); // ← добавить
+}
+
+function changeView(mode) {
+  viewMode = mode;
+  render();
+  updateButtonStates(); // ← добавить
+  setTimeout(() => scrollToToday(), 50);
+}
+
+function scrollToToday() {
+  try {
+    const wrapper = document.querySelector('.chart-wrapper');
+    if (!wrapper) return;
+    
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    // Используем отфильтрованные данные для определения диапазона
+    const filteredVacations = getFilteredVacations();
+    const filteredDuties = getFilteredDuties();
+    
+    let currentMinDate, currentMaxDate;
+    if (filteredVacations.length > 0 || filteredDuties.length > 0) {
+      const allDates = [...filteredVacations.flatMap(v => [v.start, v.end]), ...filteredDuties.flatMap(d => [d.start, d.end])];
+      currentMinDate = new Date(Math.min(...allDates));
+      currentMaxDate = new Date(Math.max(...allDates));
+      currentMinDate = new Date(currentMinDate.getFullYear(), currentMinDate.getMonth(), 1);
+      currentMaxDate = new Date(currentMaxDate.getFullYear(), currentMaxDate.getMonth() + 1, 0);
+    } else {
+      currentMinDate = minDate;
+      currentMaxDate = maxDate;
+    }
+    
+    if (today < currentMinDate || today > currentMaxDate) return;
+    
+    const cellSize = getCellSize();
+    const offset = daysBetween(currentMinDate, today);
+    const todayPosition = offset * cellSize;
+    
+    if (wrapper.clientWidth === 0 || wrapper.scrollWidth === 0) {
+      setTimeout(() => scrollToToday(), 100);
+      return;
+    }
+    
+    const centerOffset = wrapper.clientWidth / 2;
+    let scrollLeft = todayPosition - centerOffset;
+    
+    const maxScroll = wrapper.scrollWidth - wrapper.clientWidth;
+    scrollLeft = Math.max(0, Math.min(scrollLeft, maxScroll));
+    
+    wrapper.scrollTo({ left: scrollLeft, behavior: 'smooth' });
+  } catch (err) {
+    console.error('Ошибка в scrollToToday:', err);
+  }
+}
+
+function scrollChart(direction) {
+  const wrapper = document.querySelector('.chart-wrapper');
+  const scrollAmount = wrapper.clientWidth * 0.8;
+  switch(direction) {
+    case 'left': wrapper.scrollBy({ left: -scrollAmount, behavior: 'smooth' }); break;
+    case 'right': wrapper.scrollBy({ left: scrollAmount, behavior: 'smooth' }); break;
+    case 'start': wrapper.scrollTo({ left: 0, behavior: 'smooth' }); break;
+    case 'end': wrapper.scrollTo({ left: wrapper.scrollWidth, behavior: 'smooth' }); break;
+  }
+}
+
+function handleDragStart(e) {
+  draggedEmployee = this.dataset.employee;
+  dragSrcIndex = parseInt(this.dataset.index);
+  this.classList.add('dragging');
+  e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setData('text/plain', this.dataset.employee);
+}
+
+function handleDragEnd(e) {
+  this.classList.remove('dragging');
+  document.querySelectorAll('.row-label').forEach(row => row.classList.remove('drag-over'));
+  draggedEmployee = null;
+  dragSrcIndex = null;
+}
+
+function handleDragOver(e) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  return false;
+}
+
+function handleDragEnter(e) {
+  if (this !== e.target && !this.classList.contains('dragging')) {
+    this.classList.add('drag-over');
+  }
+}
+
+function handleDragLeave(e) {
+  this.classList.remove('drag-over');
+}
+
+function handleDrop(e) {
+  e.preventDefault();
+  e.stopPropagation();
+  const draggedIdx = dragSrcIndex;
+  const targetIdx = parseInt(this.dataset.index);
+  document.querySelectorAll('.row-label').forEach(row => row.classList.remove('drag-over'));
+  
+  if (draggedIdx !== targetIdx && !isNaN(targetIdx)) {
+    const filteredEmployees = getFilteredEmployees();
+    const draggedEmp = filteredEmployees[draggedIdx];
+    const targetEmp = filteredEmployees[targetIdx];
+    
+    if (!draggedEmp || !targetEmp) return false;
+    
+    // Находим индексы в основном массиве employees
+    const mainDraggedIdx = employees.indexOf(draggedEmp);
+    const mainTargetIdx = employees.indexOf(targetEmp);
+    
+    if (mainDraggedIdx === -1 || mainTargetIdx === -1) return false;
+    
+    // Переставляем в основном массиве
+    const newEmployees = [...employees];
+    const [removed] = newEmployees.splice(mainDraggedIdx, 1);
+    newEmployees.splice(mainTargetIdx, 0, removed);
+    employees = newEmployees;
+    
+    render();
+    saveEmployeeOrder();
+  }
+  return false;
+}
+
+function saveEmployeeOrder() {
+  localStorage.setItem('employeeOrder', JSON.stringify(employees));
+}
+
+function loadEmployeeOrder() {
+  const saved = localStorage.getItem('employeeOrder');
+  if (saved) {
+    const savedOrder = JSON.parse(saved);
+    const currentEmployees = [...new Set([...vacations.map(v => v.name), ...duties.map(d => d.name)])];
+    const isValid = savedOrder.every(emp => currentEmployees.includes(emp));
+    if (isValid) employees = savedOrder;
+  }
+}
+
+const excelUploadWrapper = document.getElementById('excelUploadWrapper');
+const excelTooltipEl = document.getElementById('excelTooltip');
+
+const excelTooltipContent = `
+<strong>📥 Загрузка Excel файла</strong>
+При нажатии на кнопку:
+<ul>
+  <li>Функция читает Excel файл</li>
+  <li>Ищет листы "отпуска" и "дежурства" (регистронезависимо)</li>
+  <li>Парсит данные: Сотрудник | Дата | Дни | Отдел</li>
+  <li>Конвертирует даты из Excel формата (поддерживает Date объекты, числа и строки)</li>
+  <li>Обновляет график с новыми данными</li>
+  <li>Показывает сообщение об успехе/ошибке</li>
+</ul>
+<strong>Ожидаемая структура Excel файла:</strong>
+<ul>
+  <li>Лист "отпуска" — данные об отпусках</li>
+  <li>Лист "дежурства" — данные о дежурствах</li>
+  <li>Первая строка — заголовки (любые)</li>
+  <li>Столбец A — имя сотрудника</li>
+  <li>Столбец B — дата начала</li>
+  <li>Столбец C — количество дней</li>
+  <li>Столбец D — отдел сотрудника (необязательно)</li>
+</ul>
+`;
+
+excelUploadWrapper.addEventListener('mouseenter', function(e) {
+  excelTooltipEl.innerHTML = excelTooltipContent;
+  excelTooltipEl.style.display = 'block';
+  
+  const rect = this.getBoundingClientRect();
+  const tooltipRect = excelTooltipEl.getBoundingClientRect();
+  
+  let left = rect.right + 10;
+  let top = rect.top;
+  
+  if (left + tooltipRect.width > window.innerWidth) {
+    left = rect.left - tooltipRect.width - 10;
+  }
+  
+  if (top + tooltipRect.height > window.innerHeight) {
+    top = window.innerHeight - tooltipRect.height - 10;
+  }
+  
+  if (top < 0) {
+    top = 10;
+  }
+  
+  excelTooltipEl.style.left = left + 'px';
+  excelTooltipEl.style.top = top + 'px';
+});
+
+excelUploadWrapper.addEventListener('mousemove', function(e) {
+  const tooltipRect = excelTooltipEl.getBoundingClientRect();
+  const offsetX = 15;
+  const offsetY = 15;
+  
+  let left = e.clientX + offsetX;
+  let top = e.clientY + offsetY;
+  
+  if (left + tooltipRect.width > window.innerWidth) {
+    left = e.clientX - tooltipRect.width - offsetX;
+  }
+  
+  if (top + tooltipRect.height > window.innerHeight) {
+    top = e.clientY - tooltipRect.height - offsetY;
+  }
+  
+  if (left < 0) {
+    left = offsetX;
+  }
+  
+  if (top < 0) {
+    top = offsetY;
+  }
+  
+  excelTooltipEl.style.left = left + 'px';
+  excelTooltipEl.style.top = top + 'px';
+});
+
+excelUploadWrapper.addEventListener('mouseleave', function() {
+  excelTooltipEl.style.display = 'none';
+});
+
+loadEmployeeOrder();
+loadColors();
+initDepartmentsFilter();
+renderDepartmentsFilter();
+render();
+updateButtonStates(); // ← добавить
+</script>
+
+</body>
+</html>
